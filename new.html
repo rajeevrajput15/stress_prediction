@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Real-Time Stress Monitoring System</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%23111827'/><path d='M8 54h22l10-28 16 48 10-20h26' fill='none' stroke='white' stroke-width='7'/></svg>">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--bg:#f3f4f6;--card:#fff;--ink:#111827;--ink2:#374151;--mut:#6b7280;--line:#e5e7eb;--steel:#3b5b7a;
+--low:#2f7d5b;--mid:#b7791f;--high:#b42318}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;line-height:1.55;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+header{background:var(--ink);color:#fff}
+.in{max-width:1180px;margin:0 auto;padding:0 20px}
+header .in{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:center;padding:22px 20px}
+h1{margin:0;font-size:clamp(1.3rem,3vw,1.8rem);font-weight:650;letter-spacing:-.01em}
+header p{margin:2px 0 0;color:#9ca3af;font-size:.92rem}
+.acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.b{font:inherit;font-size:.9rem;padding:8px 14px;border-radius:6px;cursor:pointer;border:1px solid #4b5563;background:transparent;color:#fff}
+.b:hover{background:#fff;color:var(--ink)}
+.b:focus-visible,input:focus-visible{outline:3px solid var(--steel);outline-offset:2px}
+.acts input[type=file]{display:none}
+.tog{color:#d1d5db;font-size:.88rem;display:flex;gap:6px;align-items:center}
+main{max-width:1180px;margin:0 auto;padding:22px 20px 56px}
+#msg{display:none;margin-bottom:16px;padding:10px 14px;border-radius:6px;background:#fdecea;border-left:4px solid var(--high);font-size:.92rem}
+#msg.ok{background:#e8f3ee;border-left-color:var(--low)}
+h2{font-size:1.15rem;font-weight:650;margin:34px 0 4px}
+.sub{color:var(--mut);margin:0 0 14px;font-size:.94rem;max-width:75ch}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px}
+.card h3{margin:0;font-size:.95rem;font-weight:600;color:var(--ink2)}
+.card p{margin:6px 0 0;color:var(--mut);font-size:.86rem}
+.subj{display:grid;grid-template-columns:2fr repeat(3,1fr);gap:0;padding:0;overflow:hidden}
+.subj>div{padding:16px 18px;border-right:1px solid var(--line)}
+.subj>div:last-child{border-right:0}
+.subj label,.subj .k{display:block;font-size:.82rem;color:var(--mut);margin-bottom:4px}
+.subj input{width:100%;font:inherit;font-size:1.15rem;font-weight:600;border:0;border-bottom:2px solid var(--line);padding:4px 0;background:transparent;color:var(--ink)}
+.subj input:focus{border-bottom-color:var(--steel);outline:0}
+.subj .v{font-size:1.15rem;font-weight:600}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.kpi{border-top:3px solid var(--ink)}
+.kpi .val{font-size:2.1rem;font-weight:650;line-height:1.15;margin:6px 0 8px;font-variant-numeric:tabular-nums}
+.kpi .val small{font-size:.9rem;color:var(--mut);font-weight:500}
+.chip{display:inline-block;padding:2px 10px;border-radius:4px;font-size:.8rem;font-weight:600;color:#fff}
+.ok{background:var(--low)}.warn{background:var(--mid)}.bad{background:var(--high)}.info{background:var(--steel)}
+.two{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.box{height:250px;position:relative;margin-top:10px}
+.now{display:flex;gap:18px;align-items:center;border-left:6px solid var(--sc,#9ca3af)}
+.now .big{font-size:2rem;font-weight:700;color:var(--sc);line-height:1.1}
+.now p{margin:4px 0 0;font-size:.95rem;color:var(--ink2)}
+.ins{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.ins li{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--steel);border-radius:6px;padding:10px 14px;font-size:.93rem}
+.wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.9rem;font-variant-numeric:tabular-nums}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--mut);font-weight:600;background:#f9fafb}
+.lg{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.lg div{background:var(--card);border:1px solid var(--line);border-top:4px solid var(--c);border-radius:8px;padding:14px;font-size:.92rem;color:var(--ink2)}
+.lg b{display:block;color:var(--ink);margin-bottom:2px}
+footer{margin-top:34px;padding-top:14px;border-top:1px solid var(--line);color:var(--mut);font-size:.85rem}
+#app{display:none}
+@media(max-width:760px){.subj{grid-template-columns:1fr 1fr}.subj>div:first-child{grid-column:1/-1;border-right:0;border-bottom:1px solid var(--line)}.two{grid-template-columns:1fr}}
+@media print{.noprint{display:none!important}body{background:#fff}.card{break-inside:avoid}}
+</style>
+</head>
+<body>
+<header><div class="in">
+  <div><h1>Real-Time Stress Monitoring System</h1><p>ESP32 · MAX30102 · GSR · MPU6050 · Temperature sensor</p></div>
+  <div class="acts noprint">
+    <button class="b" id="reload">Reload data</button>
+    <label class="b">Choose CSV file<input type="file" id="file" accept=".csv,text/csv"></label>
+    <button class="b" id="print">Print / save PDF</button>
+    <label class="tog"><input type="checkbox" id="auto"> Auto-refresh (5 s)</label>
+  </div>
+</div></header>
+
+<main>
+<div id="msg"></div>
+
+<div class="card subj">
+  <div><label for="person">Test person name</label><input id="person" type="text" placeholder="Enter name" autocomplete="off"></div>
+  <div><span class="k">Report date</span><span class="v" id="date">-</span></div>
+  <div><span class="k">Samples recorded</span><span class="v" id="nS">-</span></div>
+  <div><span class="k">Latest stress level</span><span class="v" id="nL">-</span></div>
+</div>
+
+<div id="app">
+<h2>Current status</h2>
+<div class="card now" id="now" style="--sc:#9ca3af">
+  <div><div class="big" id="sTxt">-</div><p id="sMean"></p><p id="sTip" style="color:var(--mut)"></p></div>
+</div>
+
+<h2>Latest sensor readings</h2>
+<p class="sub">The most recent sample. Each card names the sensor, its value and how it compares with the normal range or with this person's own average.</p>
+<div class="grid" id="cards"></div>
+
+<h2>Findings</h2>
+<ul class="ins" id="ins"></ul>
+
+<h2>Stress overview</h2>
+<div class="two">
+  <div class="card"><h3>Distribution of stress levels</h3><p>Share of samples at each level.</p><div class="box"><canvas id="cPie"></canvas></div></div>
+  <div class="card"><h3>Stress level over time</h3><p>Every recorded sample.</p><div class="box"><canvas id="cAll"></canvas></div></div>
+  <div class="card"><h3>Last 4 inputs: stress level</h3><p>The four most recent samples.</p><div class="box"><canvas id="cLast"></canvas></div></div>
+  <div class="card"><h3>Last 4 inputs: readings</h3><p>Values recorded with each stress level.</p><div class="wrap" style="margin-top:10px"><table id="tbl"></table></div></div>
+</div>
+
+<h2>Sensor graphs</h2>
+<p class="sub">Each signal across all samples.</p>
+<div class="two" id="hist"></div>
+
+<h2>Summary statistics</h2>
+<div class="card"><div class="wrap"><table id="stats"></table></div></div>
+</div>
+
+<h2>Stress level guide</h2>
+<div class="lg">
+  <div style="--c:var(--low)"><b>0 · Low</b>Signals are calm and steady.</div>
+  <div style="--c:var(--mid)"><b>1 · Moderate</b>Some signals are raised. A short break or slow breathing can help.</div>
+  <div style="--c:var(--high)"><b>2 · High</b>Several signals are strongly raised. Rest, drink water and seek support if it continues.</div>
+</div>
+
+<footer>Real-Time Stress Monitoring System · ESP32 + MAX30102 + GSR + MPU6050. This is a learning prototype, not a medical device, and its output is not a diagnosis. Chosen files are read in your browser and are not uploaded.</footer>
+</main>
+
+<script>
+const REQ=["heart_rate","spo2","gsr","accel_x","accel_y","accel_z","temperature","stress_level"];
+const FIX={aceel_x:"accel_x",aceel_y:"accel_y",aceel_z:"accel_z"};
+const NAMEKEYS=["name","subject","person","test_person","subject_name"];
+const LAB={0:"Low",1:"Moderate",2:"High"},COL={0:"#2f7d5b",1:"#b7791f",2:"#b42318"};
+const MEAN={0:"Body signals look calm and steady.",1:"Some signals are raised, suggesting mild to moderate stress.",2:"Several signals are strongly raised, suggesting high stress."};
+const TIP={0:"Keep the current routine and stay hydrated.",1:"Try five slow breaths: in for 4 counts, out for 6.",2:"Pause, breathe slowly, drink water and rest for a few minutes."};
+const SEN=[
+{k:"heart_rate",n:"Heart rate",u:"BPM",d:"Beats per minute from the MAX30102. Tends to rise under stress."},
+{k:"spo2",n:"Blood oxygen (SpO₂)",u:"%",d:"Oxygen carried in the blood. Usually 95% or higher."},
+{k:"gsr",n:"Skin response (GSR)",u:"",d:"Skin conductance. Higher values usually mean more arousal."},
+{k:"temperature",n:"Temperature",u:"°C",d:"Skin or body temperature. Drifts as blood flow changes."}];
+const $=id=>document.getElementById(id);
+const CH={};let timer=null,csvName="";
+Chart.defaults.color="#6b7280";Chart.defaults.borderColor="#e5e7eb";Chart.defaults.font.family='"Segoe UI",system-ui,Arial,sans-serif';
+
+const show=(t,ok)=>{const m=$("msg");m.textContent=t;m.className=ok?"ok":"";m.style.display=t?"block":"none"};
+function parse(text){
+  const L=text.replace(/^\uFEFF/,"").split(/\r?\n/).filter(l=>l.trim());
+  if(L.length<2)throw Error("The CSV has no data rows.");
+  const H=L[0].split(",").map(h=>{h=h.trim().toLowerCase();return FIX[h]||h});
+  const miss=REQ.filter(c=>!H.includes(c));
+  if(miss.length)throw Error("Missing columns: "+miss.join(", ")+". Found: "+H.join(", "));
+  const ni=H.findIndex(h=>NAMEKEYS.includes(h));csvName="";
+  const R=[];
+  for(const l of L.slice(1)){const c=l.split(","),r={};let ok=true;
+    for(const k of REQ){const v=parseFloat(c[H.indexOf(k)]);if(isNaN(v)){ok=false;break}r[k]=v}
+    if(ok){r.stress_level=Math.round(r.stress_level);R.push(r);if(ni>=0&&!csvName&&c[ni])csvName=c[ni].trim()}}
+  if(!R.length)throw Error("No valid sensor data found in the CSV.");
+  return R;
+}
+const avg=a=>a.reduce((s,v)=>s+v,0)/a.length;
+const sd=a=>{const m=avg(a);return Math.sqrt(avg(a.map(v=>(v-m)**2)))};
+const fmt=v=>Number.isInteger(v)?v:v.toFixed(1);
+const mk=(id,cfg)=>{if(CH[id]){CH[id].data=cfg.data;CH[id].options=cfg.options;CH[id].update()}else CH[id]=new Chart($(id),cfg)};
+function line(id,labels,sets,o={}){
+  mk(id,{type:"line",data:{labels,datasets:sets.map(s=>({label:s.l,data:s.d,borderColor:s.c,backgroundColor:s.c+"1f",fill:sets.length==1,
+    borderWidth:2,pointRadius:labels.length>60?0:3,tension:.3,stepped:!!o.step}))},
+    options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:sets.length>1}},
+    scales:{x:{ticks:{maxTicksLimit:8}},y:o.y||{}}}});
+}
+function chipFor(k,v,all){
+  if(k=="heart_rate")return v<60?["Below normal","info"]:v<=100?["Normal","ok"]:["Elevated","bad"];
+  if(k=="spo2")return v>=95?["Normal","ok"]:v>=90?["Slightly low","warn"]:["Low","bad"];
+  const z=(v-avg(all))/(sd(all)||1);
+  return z>.75?["Above average","warn"]:z<-.75?["Below average","info"]:["Near average","ok"];
+}
+function setName(){const n=$("person").value.trim();$("person").title=n}
+
+function render(R){
+  if(csvName&&!$("person").value){$("person").value=csvName;try{localStorage.setItem("subj",csvName)}catch(e){}}
+  const last=R[R.length-1],s=last.stress_level,sc=COL[s]||"#6b7280",n=R.length;
+  $("date").textContent=new Date().toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"});
+  $("nS").textContent=n;$("nL").textContent=LAB[s]||"Unknown";
+  $("now").style.setProperty("--sc",sc);
+  $("sTxt").textContent=(LAB[s]||"Unknown")+" stress";
+  $("sMean").textContent=MEAN[s]||"The stress level in the last row is not 0, 1 or 2.";
+  $("sTip").textContent=TIP[s]||"";
+
+  const mv=(()=>{const d=(a,b)=>Math.hypot(a.accel_x-b.accel_x,a.accel_y-b.accel_y,a.accel_z-b.accel_z);
+    const ds=R.slice(1).map((r,i)=>d(r,R[i]));if(!ds.length)return false;return ds[ds.length-1]>avg(ds)*1.5})();
+  $("cards").innerHTML=SEN.map(x=>{const v=last[x.k],[t,c]=chipFor(x.k,v,R.map(r=>r[x.k]));
+    return `<div class="card kpi"><h3>${x.n}</h3><div class="val">${fmt(v)} <small>${x.u}</small></div><span class="chip ${c}">${t}</span><p>${x.d}</p></div>`}).join("")+
+    `<div class="card kpi"><h3>Movement (MPU6050)</h3><div class="val">${mv?"Moving":"Steady"}</div><span class="chip ${mv?"warn":"ok"}">${mv?"More than usual":"Normal"}</span><p>X ${fmt(last.accel_x)} · Y ${fmt(last.accel_y)} · Z ${fmt(last.accel_z)}. Movement can disturb other readings.</p></div>`;
+
+  const cnt=[0,1,2].map(v=>R.filter(r=>r.stress_level===v).length),pc=cnt.map(c=>Math.round(c/n*100));
+  const hr=R.map(r=>r.heart_rate),sp=R.map(r=>r.spo2),ins=[];
+  ins.push(`Of <b>${n}</b> samples, <b>${pc[0]}%</b> were Low, <b>${pc[1]}%</b> Moderate and <b>${pc[2]}%</b> High stress.`);
+  ins.push(`Average heart rate is <b>${avg(hr).toFixed(1)} BPM</b> (range ${Math.min(...hr)} to ${Math.max(...hr)}). The latest reading is ${last.heart_rate>avg(hr)+2?"above":last.heart_rate<avg(hr)-2?"below":"close to"} the average.`);
+  ins.push(Math.min(...sp)<95?`Blood oxygen dropped to <b>${Math.min(...sp)}%</b> at least once. Check that the sensor fits well and the finger is still.`:`Blood oxygen stayed at <b>95% or higher</b> in every sample.`);
+  if(n>=10){const a=avg(R.slice(-5).map(r=>r.stress_level)),b=avg(R.slice(-10,-5).map(r=>r.stress_level));
+    ins.push(`Stress trend is <b>${a>b+.3?"rising":a<b-.3?"falling":"steady"}</b> compared with the previous 5 samples.`)}
+  let k=1;for(let i=n-2;i>=0&&R[i].stress_level===s;i--)k++;
+  ins.push(`The last <b>${k}</b> sample${k>1?"s have":" has"} been at the <b>${LAB[s]||"Unknown"}</b> level.`);
+  $("ins").innerHTML=ins.map(t=>`<li>${t}</li>`).join("");
+
+  mk("cPie",{type:"doughnut",data:{labels:["Low","Moderate","High"],datasets:[{data:cnt,backgroundColor:["#2f7d5b","#b7791f","#b42318"],borderColor:"#fff",borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,animation:false,cutout:"62%",plugins:{legend:{position:"bottom"}}}});
+  const st=Math.max(0,n-4),l4=R.slice(st),yo={min:0,max:2,ticks:{stepSize:1,callback:v=>LAB[v]}},idx=R.map((_,i)=>i+1);
+  line("cAll",idx,[{l:"Stress",d:R.map(r=>r.stress_level),c:"#111827"}],{step:1,y:yo});
+  line("cLast",l4.map((_,i)=>"#"+(st+i+1)),[{l:"Stress",d:l4.map(r=>r.stress_level),c:"#3b5b7a"}],{step:1,y:yo});
+  $("tbl").innerHTML="<tr><th>Sample</th><th>HR</th><th>SpO₂</th><th>GSR</th><th>Temp</th><th>Stress</th></tr>"+
+    l4.map((r,i)=>`<tr><td>#${st+i+1}</td><td>${r.heart_rate}</td><td>${r.spo2}</td><td>${r.gsr}</td><td>${r.temperature}</td><td><span class="chip" style="background:${COL[r.stress_level]||"#6b7280"}">${LAB[r.stress_level]||"Unknown"}</span></td></tr>`).join("");
+
+  const H=[["hHr","Heart rate (BPM)","Pulse over time.",["heart_rate"],["#111827"]],
+   ["hSp","Blood oxygen (%)","Should stay steady; dips often mean a loose sensor.",["spo2"],["#3b5b7a"]],
+   ["hG","Skin response (GSR)","Rises with emotional arousal.",["gsr"],["#4b5563"]],
+   ["hT","Temperature (°C)","Slow drift is normal.",["temperature"],["#7b8794"]],
+   ["hA","Motion: X, Y, Z axes","Shows movement that may affect readings.",["accel_x","accel_y","accel_z"],["#111827","#3b5b7a","#9ca3af"]]];
+  if(!$("hist").children.length)$("hist").innerHTML=H.map(h=>`<div class="card"><h3>${h[1]}</h3><p>${h[2]}</p><div class="box"><canvas id="${h[0]}"></canvas></div></div>`).join("");
+  H.forEach(h=>line(h[0],idx,h[3].map((c,i)=>({l:h[3].length>1?c.slice(-1).toUpperCase():h[1],d:R.map(r=>r[c]),c:h[4][i]}))));
+
+  $("stats").innerHTML="<tr><th>Signal</th><th>Lowest</th><th>Average</th><th>Highest</th><th>Latest</th></tr>"+
+    REQ.slice(0,7).map(c=>{const a=R.map(r=>r[c]);return `<tr><td>${c.replace("_"," ")}</td><td>${fmt(Math.min(...a))}</td><td>${avg(a).toFixed(2)}</td><td>${fmt(Math.max(...a))}</td><td>${fmt(last[c])}</td></tr>`}).join("");
+  $("app").style.display="block";
+}
+async function load(){
+  try{const r=await fetch("stress_data.csv?t="+Date.now());
+    if(!r.ok)throw Error("stress_data.csv not found. Put it in the same folder as index.html, or use “Choose CSV file”.");
+    render(parse(await r.text()));show("Sensor data loaded successfully.",true)}
+  catch(e){show("❌ "+e.message)}
+}
+try{$("person").value=localStorage.getItem("subj")||""}catch(e){}
+$("person").oninput=e=>{try{localStorage.setItem("subj",e.target.value)}catch(x){}};
+$("date").textContent=new Date().toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"});
+$("reload").onclick=load;
+$("print").onclick=()=>window.print();
+$("file").onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{render(parse(r.result));show("Loaded "+f.name+".",true)}catch(err){show("❌ "+err.message)}};r.readAsText(f)};
+$("auto").onchange=e=>{clearInterval(timer);if(e.target.checked)timer=setInterval(load,5000)};
+load();
+</script>
+</body>
+</html>
