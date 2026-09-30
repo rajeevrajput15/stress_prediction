@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Real-Time Stress Monitoring System</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>❤️</text></svg>">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #eef3f6; --panel: #ffffff; --ink: #14232e; --muted: #5b6c78; --line: #d3dee5;
+    --low: #1f8a5b; --mid: #d99a1c; --high: #d64533; --teal: #0f7b8a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif; line-height: 1.5; }
+  main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; }
+  header h1 { font-size: clamp(1.6rem, 4vw, 2.4rem); margin: 0 0 4px; letter-spacing: -0.02em; }
+  header p { margin: 0; color: var(--muted); }
+  .bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 20px 0; }
+  .bar button, .bar label.btn { font: inherit; padding: 8px 14px; border: 1px solid var(--ink); background: var(--panel);
+    color: var(--ink); border-radius: 6px; cursor: pointer; }
+  .bar button:hover, .bar label.btn:hover { background: var(--ink); color: #fff; }
+  .bar input[type=file] { display: none; }
+  .bar .toggle { display: flex; gap: 6px; align-items: center; color: var(--muted); }
+  #msg { padding: 12px 14px; border-radius: 6px; margin-bottom: 16px; display: none; background: #fbe6e2; border-left: 4px solid var(--high); }
+  #msg.ok { background: #e2f3ea; border-left-color: var(--low); }
+  #app { display: none; }
+  .now { display: grid; grid-template-columns: minmax(220px, 1.2fr) 3fr; gap: 16px; }
+  .state { border-radius: 10px; padding: 24px; color: #fff; display: flex; flex-direction: column; justify-content: center; }
+  .state small { opacity: .85; }
+  .state strong { font-size: clamp(2rem, 5vw, 3rem); line-height: 1.05; letter-spacing: -0.02em; }
+  .s0 { background: var(--low); } .s1 { background: var(--mid); } .s2 { background: var(--high); } .sx { background: var(--muted); }
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .metric { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .metric span { color: var(--muted); font-size: .9rem; }
+  .metric b { display: block; font-size: 1.7rem; margin-top: 2px; }
+  h2 { font-size: 1.15rem; margin: 32px 0 12px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .panel h3 { margin: 0 0 2px; font-size: 1rem; }
+  .panel p { margin: 0 0 10px; color: var(--muted); font-size: .85rem; }
+  .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+  .chart-box { position: relative; height: 240px; }
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; }
+  .pill { color: #fff; padding: 2px 10px; border-radius: 99px; font-size: .82rem; }
+  footer { margin-top: 36px; color: var(--muted); font-size: .85rem; }
+  @media (max-width: 700px) { .now { grid-template-columns: 1fr; } .charts { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>❤️ Real-Time Stress Monitoring System</h1>
+    <p>ESP32 + MAX30102 + GSR + MPU6050 + Temperature sensor. Data from stress_data.csv.</p>
+  </header>
+
+  <div class="bar">
+    <button id="reload">Reload data</button>
+    <label class="btn">Choose CSV file<input type="file" id="file" accept=".csv,text/csv"></label>
+    <label class="toggle"><input type="checkbox" id="auto"> Auto-refresh every 5 s</label>
+  </div>
+  <div id="msg"></div>
+
+  <div id="app">
+    <section class="now">
+      <div class="state" id="state"><small>Current stress</small><strong id="stateText">-</strong></div>
+      <div class="metrics">
+        <div class="metric"><span>❤️ Heart rate</span><b id="mHr">-</b></div>
+        <div class="metric"><span>🫁 SpO₂</span><b id="mSp">-</b></div>
+        <div class="metric"><span>💧 GSR</span><b id="mGsr">-</b></div>
+        <div class="metric"><span>🌡️ Temperature</span><b id="mT">-</b></div>
+        <div class="metric"><span>Total samples</span><b id="mN">-</b></div>
+      </div>
+    </section>
+
+    <h2>Stress level, last 4 inputs</h2>
+    <div class="charts">
+      <div class="panel"><h3>Stress level</h3><p>0 = Low, 1 = Moderate, 2 = High</p>
+        <div class="chart-box"><canvas id="cStress"></canvas></div></div>
+      <div class="panel"><h3>Last 4 sensor readings</h3><p>Most recent samples in the file</p>
+        <div class="tablewrap"><table id="tbl"></table></div></div>
+    </div>
+
+    <h2>Sensor history</h2>
+    <div class="charts">
+      <div class="panel"><h3>Heart rate</h3><p>BPM per sample</p><div class="chart-box"><canvas id="cHr"></canvas></div></div>
+      <div class="panel"><h3>SpO₂</h3><p>Blood oxygen saturation (%)</p><div class="chart-box"><canvas id="cSp"></canvas></div></div>
+      <div class="panel"><h3>GSR</h3><p>Galvanic skin response</p><div class="chart-box"><canvas id="cGsr"></canvas></div></div>
+      <div class="panel"><h3>Temperature</h3><p>Degrees Celsius</p><div class="chart-box"><canvas id="cT"></canvas></div></div>
+      <div class="panel"><h3>MPU6050 accelerometer</h3><p>X, Y and Z axes</p><div class="chart-box"><canvas id="cAcc"></canvas></div></div>
+    </div>
+  </div>
+
+  <footer>Real-Time Stress Monitoring System | ESP32 + MAX30102 + GSR + MPU6050</footer>
+</main>
+
+<script>
+const REQUIRED = ["heart_rate","spo2","gsr","accel_x","accel_y","accel_z","temperature","stress_level"];
+const LABELS = {0:"Low",1:"Moderate",2:"High"};
+const COLORS = {0:"#1f8a5b",1:"#d99a1c",2:"#d64533"};
+const FIX = {aceel_x:"accel_x", aceel_y:"accel_y", aceel_z:"accel_z"};
+const charts = {};
+let timer = null;
+
+const $ = id => document.getElementById(id);
+function show(text, ok) { const m = $("msg"); m.textContent = text; m.className = ok ? "ok" : ""; m.style.display = text ? "block" : "none"; }
+
+function parseCSV(text) {
+  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/).filter(l => l.trim() !== "");
+  if (lines.length < 2) throw new Error("The CSV has no data rows.");
+  const head = lines[0].split(",").map(h => { h = h.trim().toLowerCase(); return FIX[h] || h; });
+  const missing = REQUIRED.filter(c => !head.includes(c));
+  if (missing.length) throw new Error("Missing columns: " + missing.join(", ") + ". Columns found: " + head.join(", "));
+  const rows = [];
+  for (const line of lines.slice(1)) {
+    const cells = line.split(",");
+    const row = {};
+    let valid = true;
+    for (const c of REQUIRED) {
+      const v = parseFloat(cells[head.indexOf(c)]);
+      if (Number.isNaN(v)) { valid = false; break; }
+      row[c] = v;
+    }
+    if (valid) { row.stress_level = Math.round(row.stress_level); rows.push(row); }
+  }
+  if (!rows.length) throw new Error("No valid sensor data found in the CSV.");
+  return rows;
+}
+
+function draw(id, labels, sets, opts = {}) {
+  const cfg = { type: "line",
+    data: { labels, datasets: sets.map(s => ({ label: s.label, data: s.data, borderColor: s.color, backgroundColor: s.color,
+      borderWidth: 2, pointRadius: labels.length > 60 ? 0 : 3, tension: .25, stepped: opts.stepped || false })) },
+    options: { responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { display: sets.length > 1 } },
+      scales: { x: { ticks: { maxTicksLimit: 8 } }, y: opts.y || {} } } };
+  if (charts[id]) { charts[id].data = cfg.data; charts[id].options = cfg.options; charts[id].update(); }
+  else charts[id] = new Chart($(id), cfg);
+}
+
+function render(rows) {
+  const last = rows[rows.length - 1];
+  const s = last.stress_level;
+  $("state").className = "state " + (LABELS[s] ? "s" + s : "sx");
+  $("stateText").textContent = (LABELS[s] || "Unknown") + " stress";
+  $("mHr").textContent = last.heart_rate.toFixed(1) + " BPM";
+  $("mSp").textContent = last.spo2.toFixed(1) + " %";
+  $("mGsr").textContent = last.gsr.toFixed(1);
+  $("mT").textContent = last.temperature.toFixed(1) + " °C";
+  $("mN").textContent = rows.length;
+
+  const idx = rows.map((_, i) => i + 1);
+  draw("cHr", idx, [{label:"Heart rate", data: rows.map(r => r.heart_rate), color:"#d64533"}]);
+  draw("cSp", idx, [{label:"SpO₂", data: rows.map(r => r.spo2), color:"#0f7b8a"}]);
+  draw("cGsr", idx, [{label:"GSR", data: rows.map(r => r.gsr), color:"#6a4fb3"}]);
+  draw("cT", idx, [{label:"Temperature", data: rows.map(r => r.temperature), color:"#d99a1c"}]);
+  draw("cAcc", idx, [
+    {label:"X", data: rows.map(r => r.accel_x), color:"#d64533"},
+    {label:"Y", data: rows.map(r => r.accel_y), color:"#1f8a5b"},
+    {label:"Z", data: rows.map(r => r.accel_z), color:"#0f7b8a"}]);
+
+  const start = Math.max(0, rows.length - 4);
+  const l4 = rows.slice(start);
+  draw("cStress", l4.map((_, i) => "#" + (start + i + 1)),
+    [{label:"Stress", data: l4.map(r => r.stress_level), color:"#14232e"}],
+    { stepped: true, y: { min: 0, max: 2, ticks: { stepSize: 1, callback: v => LABELS[v] } } });
+
+  let html = "<tr><th>Sample</th><th>Heart rate (BPM)</th><th>SpO₂ (%)</th><th>GSR</th><th>Temp (°C)</th><th>Accel X</th><th>Accel Y</th><th>Accel Z</th><th>Stress</th></tr>";
+  l4.forEach((r, i) => {
+    const c = COLORS[r.stress_level] || "#5b6c78";
+    html += `<tr><td>#${start + i + 1}</td><td>${r.heart_rate}</td><td>${r.spo2}</td><td>${r.gsr}</td><td>${r.temperature}</td>` +
+      `<td>${r.accel_x}</td><td>${r.accel_y}</td><td>${r.accel_z}</td>` +
+      `<td><span class="pill" style="background:${c}">${LABELS[r.stress_level] || "Unknown"}</span></td></tr>`;
+  });
+  $("tbl").innerHTML = html;
+  $("app").style.display = "block";
+}
+
+async function load() {
+  try {
+    const res = await fetch("stress_data.csv?t=" + Date.now());
+    if (!res.ok) throw new Error("stress_data.csv not found. Put it in the same folder as index.html, or use “Choose CSV file”.");
+    render(parseCSV(await res.text()));
+    show("Sensor data loaded successfully.", true);
+  } catch (e) { show("❌ " + e.message); }
+}
+
+$("reload").onclick = load;
+$("file").onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { try { render(parseCSV(r.result)); show("Loaded " + f.name + ".", true); } catch (err) { show("❌ " + err.message); } };
+  r.readAsText(f);
+};
+$("auto").onchange = e => { clearInterval(timer); if (e.target.checked) timer = setInterval(load, 5000); };
+load();
+</script>
+</body>
+</html>
